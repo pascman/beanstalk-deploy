@@ -138,7 +138,7 @@ function expect(status, result, extraErrorMessage) {
 }
 
 //Uploads zip file, creates new version and deploys it
-function deployNewVersion(application, environmentName, versionLabel, versionDescription, file, bucket, waitUntilDeploymentIsFinished, waitForRecoverySeconds) {
+function deployNewVersion(application, onlyCreateVersion, environmentName, versionLabel, versionDescription, file, bucket, waitUntilDeploymentIsFinished, waitForRecoverySeconds) {
     //Lots of characters that will mess up an S3 filename, so only allow alphanumeric, - and _ in the actual file name.
     //The version label can still contain all that other stuff though.
     let s3filename = versionLabel.replace(/[^a-zA-Z0-9-_]/g, '-');
@@ -179,6 +179,9 @@ function deployNewVersion(application, environmentName, versionLabel, versionDes
             console.log(`No environment name given, so exiting now without deploying the new version ${versionLabel} anywhere.`);
             process.exit(0);
         }
+        if(onlyCreateVersion) {
+            process.exit(1);            
+        }
         deployStart = new Date();
         console.log(`Starting deployment of version ${versionLabel} to environment ${environmentName}`);
         return deployBeanstalkVersion(application, environmentName, versionLabel, waitForRecoverySeconds);
@@ -209,10 +212,13 @@ function deployNewVersion(application, environmentName, versionLabel, versionDes
 }
 
 //Deploys existing version in EB
-function deployExistingVersion(application, environmentName, versionLabel, waitUntilDeploymentIsFinished, waitForRecoverySeconds) {
+function deployExistingVersion(application, onlyCreateVersion, environmentName, versionLabel, waitUntilDeploymentIsFinished, waitForRecoverySeconds) {
     let deployStart = new Date();
     console.log(`Deploying existing version ${versionLabel}`);
-
+    if(onlyCreateVersion) {
+        console.log('Environment Exist');
+        process.exit(0);
+    }
     deployBeanstalkVersion(application, environmentName, versionLabel).then(result => {
 
         expect(200, result, "Failed to deploy an existing version");
@@ -249,7 +255,7 @@ function main() {
 
     let application,
         environmentName,
-        onlyCreateVersion,
+        onlyCreateVersion = true,
         versionLabel,
         versionDescription,
         region,
@@ -279,7 +285,9 @@ function main() {
         if ((process.env.INPUT_WAIT_FOR_DEPLOYMENT || '').toLowerCase() == 'false') {
             waitUntilDeploymentIsFinished = false;
         }
-
+        if ((process.env.INPUT_ONLY_CREATE_VERSION || '').toLowerCase() == 'false') {
+            onlyCreateVersion = false
+        }
         if (process.env.INPUT_WAIT_FOR_ENVIRONMENT_RECOVERY) {
             waitForRecoverySeconds = parseInt(process.env.INPUT_WAIT_FOR_ENVIRONMENT_RECOVERY);
         }
@@ -366,11 +374,11 @@ function main() {
                 }
                 console.log(`Deploying existing version ${versionLabel}, version info:`);
                 console.log(JSON.stringify(versionsList[0], null, 2));
-                deployExistingVersion(application, environmentName, versionLabel, waitUntilDeploymentIsFinished, waitForRecoverySeconds);
+                deployExistingVersion(application, onlyCreateVersion, environmentName, versionLabel, waitUntilDeploymentIsFinished, waitForRecoverySeconds);
             }
         } else {
             if (file) {
-                deployNewVersion(application, environmentName, versionLabel, versionDescription, file, existingBucketName, waitUntilDeploymentIsFinished, waitForRecoverySeconds);
+                deployNewVersion(application, onlyCreateVersion , environmentName, versionLabel, versionDescription, file, existingBucketName, waitUntilDeploymentIsFinished, waitForRecoverySeconds);
             } else {
                 console.error(`Deployment failed: No deployment package given but version ${versionLabel} doesn't exist, so nothing to deploy!`);
                 process.exit(2);
