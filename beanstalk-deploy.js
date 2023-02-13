@@ -249,6 +249,7 @@ function main() {
 
     let application,
         environmentName,
+        onlyCreateVersion,
         versionLabel,
         versionDescription,
         region,
